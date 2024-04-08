@@ -18,7 +18,7 @@ STR_WELCOME                       :{}{BIG_FONT}Hello and welcome to the City Bui
 
 #news
 STR_NEW_HQ                        :{COMPANY} has claimed {TOWN}
-STR_PLACE_HQ                      :Place your HQ in a town to claim it, cities cannot be claimed!
+STR_PLACE_HQ                      :Start by placing your HQ in a town to claim it, cities cannot be claimed!
 STR_TOWN_CLAIMED                  :{COMPANY} claimed {TOWN}
 STR_TOWN_POPLIMIT                 :{COMPANY} failed to claim {TOWN} because of too big population
 STR_TOWN_NOTCLAIMED               :{COMPANY} have not found any town nearby
@@ -128,3 +128,5 @@ STR_RAW                            :{RAW_STRING}
 #usable colours
 #{BLACK}  {WHITE} {RED}    {GREEN} {BLUE}   {YELLOW} {ORANGE} {PURPLE} {GRAY}   {BROWN} {SILVER} {GOLD} {CREAM}  {LTBLUE} {DKBLUE} {DKGREEN} {LTBROWN}
 
+
+STR_SETTINGS_ADMIN_PORT            :Enable AdminPort Interface

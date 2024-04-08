@@ -6,6 +6,9 @@
 function SimpletonCB::Log(string, level = 0){
 	if(level <= this.log) {
 		GSLog.Info(string);
+		if (this.GetSetting("logtoadminport")) {
+			this.adminbot.SendGSLog( string );
+		}
 	}
 }
 
@@ -14,7 +17,7 @@ function SimpletonCB::xMapgen(){
 	if(GSController.GetSetting("xMapgen") == 0) {
 		return;
 	}
-	GSLog.Info("Mapgen starts");
+	this.Log("Mapgen starts");
 
 	local climate = GSGame.GetLandscape();
 
@@ -54,7 +57,7 @@ function SimpletonCB::PlaceIndustry(ind, cargo, distmin, distmax, method, onlyCi
 		xtownlist.RemoveItem(closetownid);
 		skip++;
 	}
-	GSLog.Info("Mapgen will skip " + skip + " towns");
+	this.Log("Mapgen will skip " + skip + " towns");
 	skip = 0;
 
 	GSCompanyMode(GSCompany.COMPANY_INVALID); //since 1.3.0 we can use GAIA company
@@ -132,7 +135,7 @@ function SimpletonCB::PlaceIndustry(ind, cargo, distmin, distmax, method, onlyCi
 			skip++;
 		}
 	}
-	GSLog.Info("Mapgen has built " + built + " " + GSIndustryType.GetName(ind) + "s failed in " + skip + (onlyCity ? " cities" : " towns") + " of all " + towncount);
+	this.Log("Mapgen has built " + built + " " + GSIndustryType.GetName(ind) + "s failed in " + skip + (onlyCity ? " cities" : " towns") + " of all " + towncount);
 }
 /* /MAP GENERATION */
 
@@ -194,7 +197,7 @@ function SimpletonCB::xMapgenRem() {
 		local demoresult = GSTile.DemolishTile(ti);
 		//GSIndustry.SetText(indid, GSText(GSText.STR_RAW, "IID " + indid));
 		GSIndustry.SetText(indid, "IID " + indid);
-		GSLog.Info("IND ITEM " + indid + "  tile " + X + ":" + Y + " demo=" + (demoresult ? 1 : 0) + " ERR = " + GSError.GetLastErrorString());
+		this.Log("IND ITEM " + indid + "  tile " + X + ":" + Y + " demo=" + (demoresult ? 1 : 0) + " ERR = " + GSError.GetLastErrorString());
 		
 		
 	}

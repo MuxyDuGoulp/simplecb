@@ -10,17 +10,17 @@
 		- xOR, Knogle and Frank for help and Sign management part
 		- Zuu, frosch and OpenTTD Development team for GS and all (openttd.org)
 */
-
+require("version.nut");
 class SimpletonCBInfo extends GSInfo {
-	function GetAuthor()      { return "TheDude"; }
-	function GetName()        { return "Simpleton's City Builder"; }
-	function GetDescription() { return "Easily configured City Builder simulation script"; }
-	function GetVersion()     { return 13; }
-	function GetDate()        { return "2021-08-25"; }
+	function GetAuthor()      { return INFO_AUTHOR; }
+	function GetName()        { return INFO_NAME; }
+	function GetDescription() { return INFO_DESCRIPTION; }
+	function GetVersion()     { return INFO_VERSION; }
+	function GetDate()        { return INFO_DATE; }
 	function CreateInstance() { return "SimpletonCB"; }
-	function GetShortName()   { return "SMCB"; }
-	function GetAPIVersion()  { return "1.11"; }
-	function GetUrl()         { return "https://www.novapolis.net"; }
+	function GetShortName()   { return INFO_SHORTNAME; }
+	function GetAPIVersion()  { return INFO_APIVERSION; }
+	function GetUrl()         { return INFO_URL; }
 
 	function GetSettings() {
 		AddSetting({
@@ -38,6 +38,24 @@ class SimpletonCBInfo extends GSInfo {
 			"morelogs", {_0 = "Normal", _1 = "More", _2 = "More more"}
 		);
 
+		AddSetting({
+			name = "adminport",
+			description = "Enable AdminPort Interface",
+			easy_value = 0,
+			medium_value = 0,
+			hard_value = 0,
+			custom_value = 0,
+			flags = CONFIG_BOOLEAN | CONFIG_INGAME
+		});
+		AddSetting({
+			name = "logtoadminport",
+			description = "Transfert Log to AdminPort",
+			easy_value = 0,
+			medium_value = 0,
+			hard_value = 0,
+			custom_value = 0,
+			flags = CONFIG_BOOLEAN | CONFIG_INGAME
+		});
 		AddSetting({
 			name = "startpause",
 			description = "Pause game on start. Unpause when first company starts",

@@ -38,6 +38,7 @@ function SimpletonCB::GoalProgress(checkgamelength = 0){
 				txt = GSText.STR_WINNER_GOAL;
 			}
 			this.SendGlobalMessage(GSText(txt, winner, winamount));
+			this.adminbot.SendGSLog( "SMCB:END" )
 		}
 	}
 }

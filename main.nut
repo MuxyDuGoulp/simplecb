@@ -3,10 +3,12 @@
 	Simpleton class - main class
 */
 
+require("adminbot.nut");
 require("town.nut");
 require("classes.nut");
 
 scriptInstance <- null;
+
 const SCRIPT_VERSION = 13; //the same as in info.nut. For save/load
 const NUMCARGO = 64; //number of cargos in OpenTTD
 const INVALID_TOWN = 0xFFFF; //invalid town id
@@ -82,8 +84,11 @@ class SimpletonCB extends GSController
 
 	log = 0;
 
+	adminbot = null;
+	
 	constructor()
 	{
+		this.adminbot = AdminBot( );
 		this.scorelist = GSList();
 		this.signlist = GSList();
 		//                Settlement  Resort Village Town   City  Metropolis
@@ -122,12 +127,37 @@ class SimpletonCB extends GSController
 	function SendGlobalMessage(txt);
 	function StoryStart();
 	function Story();
+	function BuildScore();
 }
 
-
+function SimpletonCB::BuildScore( )
+{
+	local mainscore = {}
+	local score = []
+	this.Log("BuildScore:");
+	foreach(company in this.companies) {
+		local companyscore = {};
+		if(company.town_id != INVALID_TOWN) { //if proper town is claimed, save to scorelist
+			companyscore.companyid <- company.id;
+			companyscore.townid <- company.town_id;
+			companyscore.population <- GSTown.GetPopulation(company.town_id);
+			companyscore.houses <- GSTown.GetHouseCount(company.town_id)
+			companyscore.growrate <- GSTown.GetGrowthRate(company.town_id)
+			score.append( companyscore );
+		}
+	}
+	if (score.len() > 0) {
+		this.Log("BuildScore:Sending " + score.len() );
+		mainscore.GSScore <- score;
+		this.adminbot.SendObjectToAdmin( mainscore );
+	} else {
+		this.Log("BuildScore:Nohting to send");
+	}
+}
 
 function SimpletonCB::Start() {
-	Log("### Simpleton city Builder STARTS ###");
+	this.Log("### Simpleton city Builder STARTS ###");
+	this.adminbot.SendGSInfo( );
 	/* load settings */
 	this.log = GSController.GetSetting("morelogs");
 	if(this.from_save == false) {
@@ -168,6 +198,7 @@ function SimpletonCB::Start() {
 	// 31 ticks ~= 1 second,	 1 game day ~= 2,3s, 1 game month ~= 75s
 	sleeptime = TOWNTICKS;
 
+	this.adminbot.SendGSLog("Main loop starts");
 	while (true) {
 		this.Process();
 		this.Sleep(sleeptime);
@@ -191,6 +222,7 @@ function SimpletonCB::Process() {
 	if(this.flow_days >= BREAKDAYS) {
 		this.flow_days = 0;
 		this.DailyLoop();
+		//this.adminbot.SendGSLog("SMCB:DAILY");
 		if(this.current_month == this.last_month) { //skip if new month, so we dont do the same twice as it is in montly loop
 			this.TownsUpdate(false); //only update deliveries and town gui
 		}
@@ -205,9 +237,15 @@ function SimpletonCB::Process() {
 	this.last_month = this.current_month;
 	this.MonthlyLoop();
 	//this.xMapgenRem();
+	//this.adminbot.SendGSLog("SMCB:MONTHLY");
+	this.BuildScore( );
+	if (( this.current_month -1 )%4==0) {
+		//this.adminbot.SendGSLog("SMCB:QUARTERLY");
+	}
 
 	if(this.current_month == 1) {
 		this.YearlyLoop();
+		//this.adminbot.SendGSLog("SMCB:YEARLY");
 	}
 
 	this.TownsUpdate(true); //update all
@@ -216,7 +254,7 @@ function SimpletonCB::Process() {
 function SimpletonCB::CheckEvents() {
 	if(this.firstrun == true && GSController.GetSetting("startpause") == 1) {
 		GSGame.Pause();
-		GSLog.Info("GS pausing");
+		this.Log("GS pausing");
 	}
 	/* company pool changes */
 	while(GSEventController.IsEventWaiting()) {
@@ -226,20 +264,28 @@ function SimpletonCB::CheckEvents() {
 		}
 		local eventType = event.GetEventType();
 		switch(eventType) {
+
+			case GSEvent.ET_ADMIN_PORT:
+				// Admin-Bot is trying to talk to me forward to admin bot
+				this.adminbot.HandleAdminEvent( event )
+				break;
+
 			case GSEvent.ET_COMPANY_BANKRUPT:	{
 				// Delete the company from the company pool and unclaim town
 				local deadcompany = GSEventCompanyBankrupt.Convert(event);
 				this.CompanyRemoveByID(deadcompany.GetCompanyID());
-				GSLog.Info("Found bankrupted company!");
+				this.Log("Found bankrupted company!");
 				break;
 			}
+
 			case GSEvent.ET_COMPANY_MERGER: {
 				// Merge the companies, remove old company and unclaim town
 				local merge = GSEventCompanyMerger.Convert(event);
 				this.CompanyRemoveByID(merge.GetOldCompanyID());
-				GSLog.Info("Company merge of company " + merge.GetOldCompanyID() + " into " + GSCompany.GetName(merge.GetNewCompanyID()));
+				this.Log("Company merge of company " + merge.GetOldCompanyID() + " into " + GSCompany.GetName(merge.GetNewCompanyID()));
 				break;
 			}
+
 			case GSEvent.ET_COMPANY_NEW: {
 				//new company
 				local newcompany = GSEventCompanyNew.Convert(event);
@@ -252,14 +298,17 @@ function SimpletonCB::CheckEvents() {
 				if(this.log == 0) {
 					GSGoal.Question(0, cid, GSText(GSText.STR_WELCOME), GSGoal.QT_INFORMATION, GSGoal.BUTTON_START);
 				}
-				GSLog.Info("Found new company! " + cid);
+				this.Log("Found new company! " + cid);
+				this.adminbot.SendGSLog("SMCB:NEWCOMPANY");
+
 
 				if(GSGame.IsPaused()) {
 					GSGame.Unpause();
-					GSLog.Info("GS unpausing");
+					this.Log("GS unpausing");
 				}
 				break;
 			}
+
 			case GSEvent.ET_TOWN_FOUNDED: {
 				//new town funded
 				local newtown = GSEventTownFounded.Convert(event);
@@ -270,6 +319,7 @@ function SimpletonCB::CheckEvents() {
 				}
 				break;
 			}
+
 		}
 	}
 }
@@ -403,7 +453,7 @@ function SimpletonCB::HQClaimTown() {
 				company.town_id = INVALID_TOWN;
 				GSNews.Create(GSNews.NT_GENERAL, GSText(GSText.STR_TOWN_NOTCLAIMED, company.id), GSCompany.COMPANY_INVALID, GSNews.NR_TOWN, closest_town_id);
 				GSGoal.Question(0, company.id, GSText(GSText.STR_TOWN_NOTCLAIMED_INFO), GSGoal.QT_WARNING, GSGoal.BUTTON_OK);
-				GSLog.Info(GSCompany.GetName(company.id) + " found no town nearby");
+				this.Log(GSCompany.GetName(company.id) + " found no town nearby");
 			}
 			/* if closest is city, save null and send warning */
 			else if(GSTown.IsCity(closest_town_id)) {
@@ -413,7 +463,7 @@ function SimpletonCB::HQClaimTown() {
 				company.town_id = INVALID_TOWN;
 				GSNews.Create(GSNews.NT_GENERAL, GSText(GSText.STR_CITY_NOTCLAIMED, company.id), GSCompany.COMPANY_INVALID, GSNews.NR_TOWN, closest_town_id);
 				GSGoal.Question(0, company.id, GSText(GSText.STR_CITY_NOTCLAIMED_INFO), GSGoal.QT_WARNING, GSGoal.BUTTON_OK);
-				GSLog.Info(GSCompany.GetName(company.id) + " tried claiming a city " + GSTown.GetName(closest_town_id));
+				this.Log(GSCompany.GetName(company.id) + " tried claiming a city " + GSTown.GetName(closest_town_id));
 			}
 			/* if town is already owned, send warning */
 			else if(this.TownHasOwner(closest_town_id)) {
@@ -424,7 +474,7 @@ function SimpletonCB::HQClaimTown() {
 				company.town_id = INVALID_TOWN;
 				GSNews.Create(GSNews.NT_GENERAL, GSText(GSText.STR_TOWN_HAS_OWNER, closest_town_id, other_company.id), GSCompany.COMPANY_INVALID, GSNews.NR_TOWN, closest_town_id);
 				GSGoal.Question(0, company.id, GSText(GSText.STR_TOWN_HAS_OWNER_INFO, closest_town_id, other_company.id), GSGoal.QT_WARNING, GSGoal.BUTTON_OK);
-				GSLog.Info(GSCompany.GetName(company.id) + " tried to claim owned town: " + GSTown.GetName(closest_town_id) + " owned by " + GSCompany.GetName(other_company.id));
+				this.Log(GSCompany.GetName(company.id) + " tried to claim owned town: " + GSTown.GetName(closest_town_id) + " owned by " + GSCompany.GetName(other_company.id));
 			}
 			/* There is somebody in neighbourhood */
 			else if(this.ClaimedTownNearby(closest_town_id, company.id)) {
@@ -434,7 +484,7 @@ function SimpletonCB::HQClaimTown() {
 				company.town_id = INVALID_TOWN;
 				GSNews.Create(GSNews.NT_GENERAL, GSText(GSText.STR_TOWN_NEIGHBOUR_CLOSE, company.id), GSCompany.COMPANY_INVALID, GSNews.NR_TOWN, closest_town_id);
 				GSGoal.Question(0, company.id, GSText(GSText.STR_TOWN_NEIGHBOUR_CLOSE_INFO, closest_town_id), GSGoal.QT_WARNING, GSGoal.BUTTON_OK);
-				GSLog.Info(GSCompany.GetName(company.id) + " tried to claim " + GSTown.GetName(closest_town_id) + "which is too close to another company's town");
+				this.Log(GSCompany.GetName(company.id) + " tried to claim " + GSTown.GetName(closest_town_id) + "which is too close to another company's town");
 			}
 			/* if town has bigger population than allowed to claim */
 			else if(GSTown.GetPopulation(closest_town_id) > this.claim_pop) {
@@ -444,7 +494,7 @@ function SimpletonCB::HQClaimTown() {
 				company.town_id = INVALID_TOWN;
 				GSNews.Create(GSNews.NT_GENERAL, GSText(GSText.STR_TOWN_POPLIMIT, company.id, closest_town_id), GSCompany.COMPANY_INVALID, GSNews.NR_TOWN, closest_town_id);
 				GSGoal.Question(0, company.id, GSText(GSText.STR_TOWN_POPLIMIT_INFO, closest_town_id, this.claim_pop), GSGoal.QT_WARNING, GSGoal.BUTTON_OK);
-				GSLog.Info(GSCompany.GetName(company.id) + " tried to claim town " + GSTown.GetName(closest_town_id) + "which has too high population");
+				this.Log(GSCompany.GetName(company.id) + " tried to claim town " + GSTown.GetName(closest_town_id) + "which has too high population");
 			}
 			/* TOWN CLAIMED */
 			/* if town is close enough (30), claim it */
@@ -465,12 +515,17 @@ function SimpletonCB::HQClaimTown() {
 					}
 				}
 
-				GSNews.Create(GSNews.NT_GENERAL, GSText(GSText.STR_TOWN_CLAIMED, company.id, company.town_id), GSCompany.COMPANY_INVALID, GSNews.NR_TOWN, closest_town_id);
+				GSNews.Create(
+					GSNews.NT_GENERAL
+					,GSText( GSText.STR_TOWN_CLAIMED, company.id, company.town_id )
+					,GSCompany.COMPANY_INVALID
+					,GSNews.NR_TOWN
+					,closest_town_id );
 				//inform about claiming town
 				if(this.log == 0) {
 					GSGoal.Question(0, company.id, GSText(GSText.STR_TOWN_CLAIMED_INFO, company.town_id), GSGoal.QT_INFORMATION, GSGoal.BUTTON_OK);
 				}
-				GSLog.Info(GSCompany.GetName(company.id) + " claimed " + GSTown.GetName(closest_town_id));
+				this.Log(GSCompany.GetName(company.id) + " claimed " + GSTown.GetName(closest_town_id));
 				//point to storybook for cargo requirements
 				GSGoal.Question(0, company.id, GSText(GSText.STR_POINT_TO_STORY_REQ), GSGoal.QT_INFORMATION, GSGoal.BUTTON_OK);
 			}
